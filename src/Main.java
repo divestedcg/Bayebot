@@ -27,10 +27,12 @@ import tigase.jaxmpp.core.client.xmpp.stanzas.Message;
 import tigase.jaxmpp.j2se.Jaxmpp;
 import tigase.jaxmpp.j2se.Presence;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Scanner;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class Main {
 
@@ -44,6 +46,8 @@ public class Main {
     private static final String joiningNickname = "bayebot";
     private static final double flagThresholdBC = 0.7;
     private static final double flagThresholdVC = 0.9;
+    private static final ArrayList<String> classifiedUsers = new ArrayList<>();
+    private static final HashMap<String, String> userMessageLog = new HashMap<>();
 
     private static String botAccount = "";
     private static String botAccountPassword = "";
@@ -73,6 +77,13 @@ public class Main {
                 System.out.println("[INIT] Known good message database doesn't exist, creating, please populate.");
                 fatal = true;
             }
+            File userDB = new File(configDirectory + "/Users/");
+            if (userDB.exists()) {
+                populateUserLog(userDB);
+            } else {
+                userDB.mkdir();
+                System.out.println("[INIT] User database doesn't exist, creating, please populate to use the identifier feature.");
+            }
             cfgRooms = new File(configDirectory + "/Rooms.txt");
             if (!cfgRooms.exists()) {
                 cfgRooms.createNewFile();
@@ -98,6 +109,7 @@ public class Main {
                 System.out.println("[INIT] Room list doesn't exist, creating, please populate.");
                 fatal = true;
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -118,12 +130,22 @@ public class Main {
                 public void onMucMessageReceived(SessionObject sessionObject, Message message, Room room, String nickname, Date timestamp) {
                     try {
                         if (message.getBody() != null) {
+                            String fakeJID = nickname + "@" + room.getRoomJid();
                             String messageTxt = message.getBody().toString();
+
+                            String userMessagePrevious = "";
+                            if (userMessageLog.containsKey(fakeJID)) {
+                                userMessagePrevious = userMessageLog.get(fakeJID);
+                            }
+                            if (checkLine(messageTxt)) {
+                                userMessageLog.put(fakeJID, userMessagePrevious + "\n" + messageTxt);
+                            }
+
                             handleBotAction(messageTxt, room);
 
                             double scoreVC = vc.classify(defaultCategory, messageTxt);
                             double scoreBC = bc.classify(messageTxt);
-                            System.out.println("[DEBUG] " + scoreBC + " " + scoreVC + " " + nickname + "@" + room.getRoomJid() + ": " + messageTxt);
+                            System.out.println("[DEBUG] " + scoreBC + " " + scoreVC + " [" + identifyUser(userMessageLog.get(fakeJID)) + "] " + fakeJID + ": " + messageTxt);
                             if ((scoreBC >= flagThresholdBC || scoreVC >= flagThresholdVC) && messageTxt.length() >= 10) {
                                 if (allowedToReport && !notifiedSpammer.contains(nickname) && !notSpammer.contains(nickname)) {
                                     notifiedSpammer.add(nickname);
@@ -177,7 +199,7 @@ public class Main {
         ArrayList<String> knownBad = readFileToArray(db);
         try {
             for (String line : knownBad) {
-                if (line.length() >= 20 && !line.startsWith("> ") && !line.startsWith("https://")) { //KEEP THIS IN SYNC
+                if (checkLine(line)) {
                     vc.teachMatch(defaultCategory, line);
                     bc.teachMatch(defaultCategory, line);
                     count++;
@@ -194,7 +216,7 @@ public class Main {
         ArrayList<String> knownGood = readFileToArray(db);
         try {
             for (String line : knownGood) {
-                if (line.length() > 20 && !line.startsWith("> ") && !line.startsWith("https://")) { //KEEP THIS IN SYNC
+                if (checkLine(line)) {
                     bc.teachNonMatch(defaultCategory, line);
                     count++;
                 }
@@ -203,6 +225,50 @@ public class Main {
             e.printStackTrace();
         }
         System.out.println("[DATABASE] Added good matches count: " + count);
+    }
+
+    public static void populateUserLog(File userDB) {
+        int count = 0;
+        int count2 = 0;
+        for (File file : Objects.requireNonNull(userDB.listFiles())) {
+            String user = file.getName().replaceAll(".txt", "");
+            ArrayList<String> userMessages = readFileToArray(file);
+            for (String line : userMessages) {
+                if (checkLine(line)) {
+                    try {
+                        count2++;
+                        vc.teachMatch(user, line);
+                    } catch (Exception e) {
+                        //e.printStackTrace();
+                    }
+                }
+            }
+
+            classifiedUsers.add(user);
+            count++;
+        }
+        System.out.println("[DATABASE] Added " + count + " users, with " + count2 + " messages");
+    }
+
+    public static boolean checkLine(String line) {
+        return line.length() >= 20 && !line.startsWith("> ") && !line.startsWith("https://") && StandardCharsets.US_ASCII.newEncoder().canEncode(line);
+    }
+
+    public static String identifyUser(String message) {
+        double likelyMatchPercent = 0.5;
+        String likelyMatchUser = "UNKNOWN";
+        try {
+            for (String user : classifiedUsers) {
+                double matchPercent = vc.classify(user, message);
+                if (matchPercent > likelyMatchPercent) {
+                    likelyMatchPercent = matchPercent;
+                    likelyMatchUser = user;
+                }
+            }
+        } catch (ClassifierException e) {
+            e.printStackTrace();
+        }
+        return likelyMatchUser;
     }
 
     public static void connectToRooms(File cfgRooms) {
@@ -246,6 +312,10 @@ public class Main {
                 bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage("Goodbye!");
                 bot.disconnect();
                 System.exit(0);
+            }
+            if (message.startsWith("bayebot identify ")) {
+                String[] msgSplit = message.split(" ");
+                //bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage("Potential match: " + identifyUser(msgSplit[2] + "@" + room.getRoomJid()));
             }
         } catch (JaxmppException e) {
             e.printStackTrace();
