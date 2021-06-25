@@ -109,7 +109,6 @@ public class Main {
                 System.out.println("[INIT] Room list doesn't exist, creating, please populate.");
                 fatal = true;
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -121,7 +120,6 @@ public class Main {
         try {
             Presence.initialize(bot);
             bot.getModulesManager().register(new MucModule());
-            //bot.getSessionObject().setUserProperty(StreamManagementModule.STREAM_MANAGEMENT_DISABLED_KEY, true);
             bot.getProperties().setUserProperty(SessionObject.USER_BARE_JID, BareJID.bareJIDInstance(botAccount));
             bot.getProperties().setUserProperty(SessionObject.PASSWORD, botAccountPassword);
 
@@ -151,12 +149,12 @@ public class Main {
                                     notifiedSpammer.add(nickname);
                                     String detectMessage = "Potential spam detected from " + nickname + ", score: " + scoreBC + " (bayesian) & " + scoreVC + " (vector)";
                                     System.out.println("[SPAM] " + detectMessage);
-                                    bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage(detectMessage);
+                                    bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage(detectMessage); //KEEP COMMENTED WHEN TESTING
                                 }
                             }
                         }
                     } catch (ClassifierException | JaxmppException e) {
-                        e.printStackTrace();
+                        //e.printStackTrace();
                     }
                 }
             });
@@ -170,6 +168,10 @@ public class Main {
             if (bot.isConnected()) {
                 System.out.println("[INIT] Connected");
                 connectToRooms(cfgRooms);
+                while(true) { //XXX: This shouldn't be necessary, but my connection is killed without it?
+                    Thread.sleep(1000);
+                    bot.keepalive();
+                }
             } else {
                 System.out.println("[INIT] Unable to connect within 10 seconds.");
                 System.exit(1);
@@ -197,46 +199,47 @@ public class Main {
     public static void populateBadMessageArray(File db) {
         int count = 0;
         ArrayList<String> knownBad = readFileToArray(db);
-        try {
-            for (String line : knownBad) {
-                if (checkLine(line)) {
+        for (String line : knownBad) {
+            if (checkLine(line)) {
+                try {
                     vc.teachMatch(defaultCategory, line);
                     bc.teachMatch(defaultCategory, line);
                     count++;
+                } catch (Exception e) {
+                    //e.printStackTrace();
                 }
             }
-        } catch (ClassifierException e) {
-            e.printStackTrace();
         }
+
         System.out.println("[DATABASE] Added bad matches count: " + count);
     }
 
     public static void populateGoodMessages(File db) {
         int count = 0;
         ArrayList<String> knownGood = readFileToArray(db);
-        try {
-            for (String line : knownGood) {
-                if (checkLine(line)) {
+        for (String line : knownGood) {
+            if (checkLine(line)) {
+                try {
                     bc.teachNonMatch(defaultCategory, line);
                     count++;
+                } catch (Exception e) {
+                    //e.printStackTrace();
                 }
             }
-        } catch (ClassifierException e) {
-            e.printStackTrace();
         }
         System.out.println("[DATABASE] Added good matches count: " + count);
     }
 
     public static void populateUserLog(File userDB) {
-        int count = 0;
-        int count2 = 0;
+        int countUser = 0;
+        int countLine = 0;
         for (File file : Objects.requireNonNull(userDB.listFiles())) {
             String user = file.getName().replaceAll(".txt", "");
             ArrayList<String> userMessages = readFileToArray(file);
             for (String line : userMessages) {
                 if (checkLine(line)) {
                     try {
-                        count2++;
+                        countLine++;
                         vc.teachMatch(user, line);
                     } catch (Exception e) {
                         //e.printStackTrace();
@@ -245,9 +248,9 @@ public class Main {
             }
 
             classifiedUsers.add(user);
-            count++;
+            countUser++;
         }
-        System.out.println("[DATABASE] Added " + count + " users, with " + count2 + " messages");
+        System.out.println("[DATABASE] Added " + countUser + " users, with " + countLine + " messages");
     }
 
     public static boolean checkLine(String line) {
@@ -265,8 +268,8 @@ public class Main {
                     likelyMatchUser = user;
                 }
             }
-        } catch (ClassifierException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            //e.printStackTrace();
         }
         return likelyMatchUser;
     }
@@ -320,5 +323,24 @@ public class Main {
         } catch (JaxmppException e) {
             e.printStackTrace();
         }
+    }
+
+    public static String arrayToStringChecked(ArrayList<String> array) {
+        String result = "";
+        for(String line : array) {
+            if(checkLine(line)) {
+                result += "\n" + line;
+            }
+        }
+        return result;
+    }
+
+    public static String identifyOneOff(String user, File file) {
+        try {
+            return user + " vs. " + file.getName().replaceAll(".txt", "") + ": " + vc.classify(user, arrayToStringChecked(readFileToArray(file)));
+        } catch (ClassifierException e) {
+            e.printStackTrace();
+        }
+        return "Unknown";
     }
 }
