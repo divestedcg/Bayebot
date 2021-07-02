@@ -21,3 +21,7 @@ Credits
 -------
 - Tigase Java XMPP Client Library (AGPL-3.0), https://github.com/tigase/jaxmpp
 - Classifier4J (Apache-1.1, with permission granted for use under Apache-2.0), http://classifier4j.sourceforge.net
+
+Donate
+-------
+BTC: bc1qkjtp2k7cc4kuv8k9wjdlxkeuqczenrpv5mwasl
