@@ -56,6 +56,10 @@ public class Main {
     public static void main(String[] args) {
         boolean fatal = false;
         try {
+            if (args.length == 0) {
+                System.out.println("[INIT] Must provide config directory path");
+                System.exit(1);
+            }
             File configDirectory = new File(args[0]);
             if (!configDirectory.exists() || !configDirectory.isDirectory()) {
                 System.out.println("[INIT] Invalid config directory path");
