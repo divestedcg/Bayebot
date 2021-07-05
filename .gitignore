@@ -1,5 +1,3 @@
 config
-src/net/sf/classifier4J
-src/defaultStopWords.txt
 .gradle
 build
