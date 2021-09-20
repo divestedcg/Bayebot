@@ -153,7 +153,7 @@ public class Main {
                                     notifiedSpammer.add(nickname);
                                     String detectMessage = "Potential spam detected from " + nickname + ", score: " + scoreBC + " (bayesian) & " + scoreVC + " (vector)";
                                     System.out.println("[SPAM] " + detectMessage);
-                                    bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage(detectMessage); //KEEP COMMENTED WHEN TESTING
+                                    //bot.getModule(MucModule.class).getRoom(room.getRoomJid()).sendMessage(detectMessage); //KEEP COMMENTED WHEN TESTING
                                 }
                             }
                         }
@@ -172,7 +172,7 @@ public class Main {
             if (bot.isConnected()) {
                 System.out.println("[INIT] Connected");
                 connectToRooms(cfgRooms);
-                while(true) { //XXX: This shouldn't be necessary, but my connection is killed without it?
+                while (true) { //XXX: This shouldn't be necessary, but my connection is killed without it?
                     Thread.sleep(1000);
                     bot.keepalive();
                 }
@@ -331,8 +331,8 @@ public class Main {
 
     public static String arrayToStringChecked(ArrayList<String> array) {
         String result = "";
-        for(String line : array) {
-            if(checkLine(line)) {
+        for (String line : array) {
+            if (checkLine(line)) {
                 result += "\n" + line;
             }
         }
