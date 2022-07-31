@@ -12,6 +12,10 @@ Quick Start
 - Populate Rooms.txt with rooms you want to monitor
 - Populate Account.txt with first line JID and second line password for the bot account
 
+Prebuilts
+---------
+- via CI: https://gitlab.com/divested/bayebot/-/jobs/artifacts/master/browse?job=build
+
 TODO
 ----
 - Retroactive learning from MAM based on flag users
